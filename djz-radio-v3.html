@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scuffed Epoch Radio - NSL Edition (3D Visualization)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* NSL Color System */
+            --background: hsl(250, 24%, 10%);
+            --card: hsl(250, 20%, 14%);
+            --card-foreground: hsl(250, 10%, 98%);
+            --popover: hsl(250, 24%, 12%);
+            
+            --primary: hsl(263, 70%, 60%);
+            --primary-foreground: hsl(250, 10%, 98%);
+            --primary-glow: hsl(263, 80%, 70%);
+            
+            --accent: hsl(38, 92%, 50%);
+            --accent-foreground: hsl(250, 24%, 10%);
+            --accent-glow: hsl(38, 100%, 60%);
+            
+            --secondary: hsl(250, 15%, 20%);
+            --secondary-foreground: hsl(250, 10%, 98%);
+            --muted: hsl(250, 15%, 18%);
+            --muted-foreground: hsl(250, 10%, 65%);
+            
+            --border: hsl(250, 15%, 22%);
+            --input: hsl(250, 15%, 22%);
+            --ring: hsl(263, 70%, 60%);
+            
+            --foreground: hsl(250, 10%, 98%);
+            
+            /* Shadows */
+            --shadow-elegant: 0 10px 40px -10px hsl(263, 70%, 30%, 0.4);
+            --shadow-glow: 0 0 40px hsl(263, 80%, 70%, 0.3);
+            --shadow-accent: 0 4px 20px hsl(38, 92%, 50%, 0.3);
+            
+            /* Gradients */
+            --gradient-primary: linear-gradient(135deg, hsl(263, 70%, 60%) 0%, hsl(263, 80%, 70%) 100%);
+            --gradient-accent: linear-gradient(135deg, hsl(38, 92%, 50%) 0%, hsl(38, 100%, 60%) 100%);
+            --gradient-subtle: linear-gradient(180deg, hsl(250, 20%, 14%) 0%, hsl(250, 24%, 10%) 100%);
+            
+            --radius: 0.75rem;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background);
+            color: var(--foreground);
+            min-height: 100vh;
+            font-feature-settings: "rlig" 1, "calt" 1;
+            background-image: url('https://radio.scuffedepoch.com/static/uploads/scuffed_epoch_radio/background.1761492295.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            position: relative;
+        }
+
+        .donate-button {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FF5E5B 0%, #FF3838 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            box-shadow: var(--shadow-elegant);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .donate-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 30px rgba(255, 94, 91, 0.4);
+        }
+
+        .donate-button::before {
+            content: '☕';
+            font-size: 1.5rem;
+        }
+
+        .donate-button::after {
+            content: 'Donate';
+            position: absolute;
+            top: 50%;
+            right: calc(100% + 0.75rem);
+            transform: translateY(-50%);
+            padding: 0.5rem 0.75rem;
+            background: var(--popover);
+            color: var(--foreground);
+            font-size: 0.75rem;
+            border-radius: calc(var(--radius) - 4px);
+            white-space: nowrap;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-elegant);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .donate-button:hover::after {
+            opacity: 1;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .player-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-elegant);
+            width: 100%;
+            backdrop-filter: blur(10px);
+            background: linear-gradient(135deg, 
+                hsl(250, 20%, 14%, 0.95) 0%, 
+                hsl(250, 24%, 10%, 0.95) 100%);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .header {
+            text-align: center;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .station-name {
+            font-size: 1.75rem;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.25rem;
+        }
+
+        .status {
+            color: var(--muted-foreground);
+            font-size: 0.875rem;
+        }
+
+        .status.live {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            padding: 2rem;
+        }
+
+        /* Left Column - 3D Visualization */
+        .visualization-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .visualization-container {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: calc(var(--radius) - 2px);
+            overflow: hidden;
+            background: #000;
+            box-shadow: var(--shadow-glow);
+        }
+
+        #visualizer {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .caffeination-control {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .caffeination-icon {
+            color: var(--accent);
+            font-size: 1.5rem;
+            min-width: 28px;
+            cursor: help;
+            position: relative;
+        }
+
+        .caffeination-icon:hover::after {
+            content: 'Caffeination';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--popover);
+            color: var(--foreground);
+            font-size: 0.75rem;
+            border-radius: calc(var(--radius) - 4px);
+            white-space: nowrap;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-elegant);
+            z-index: 10;
+        }
+
+        .caffeination-slider {
+            flex: 1;
+            height: 6px;
+            background: var(--muted);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .caffeination-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .caffeination-slider::-webkit-slider-thumb:hover {
+            background: var(--accent-glow);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .caffeination-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .caffeination-value {
+            color: var(--muted-foreground);
+            font-size: 0.875rem;
+            min-width: 3ch;
+            text-align: right;
+        }
+
+        /* Right Column - Controls & Info */
+        .controls-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            justify-content: flex-start;
+        }
+
+        .now-playing {
+            text-align: left;
+        }
+
+        .song-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--foreground);
+            line-height: 1.2;
+        }
+
+        .song-artist {
+            font-size: 1.125rem;
+            color: var(--muted-foreground);
+            line-height: 1.4;
+        }
+
+
+
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .control-button {
+            background: var(--primary);
+            color: var(--primary-foreground);
+            border: none;
+            border-radius: 50%;
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 1.5rem;
+        }
+
+        .control-button:hover {
+            background: var(--primary-glow);
+            box-shadow: var(--shadow-glow);
+            transform: scale(1.05);
+        }
+
+        .control-button:active {
+            transform: scale(0.95);
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .volume-icon {
+            color: var(--muted-foreground);
+            font-size: 1.25rem;
+            min-width: 24px;
+        }
+
+        .volume-slider {
+            flex: 1;
+            height: 6px;
+            background: var(--muted);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .volume-slider::-webkit-slider-thumb:hover {
+            background: var(--primary-glow);
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        .volume-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .volume-value {
+            color: var(--muted-foreground);
+            font-size: 0.875rem;
+            min-width: 3ch;
+            text-align: right;
+        }
+
+        .song-history {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .history-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--muted-foreground);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .history-item {
+            display: grid;
+            grid-template-columns: 40px 1fr auto;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 0.5rem;
+            background: var(--secondary);
+            border-radius: calc(var(--radius) - 4px);
+            transition: background 0.2s;
+        }
+
+        .history-item:hover {
+            background: var(--muted);
+        }
+
+        .history-album-art {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+            background: var(--muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .history-info {
+            min-width: 0;
+        }
+
+        .history-song {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--foreground);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .history-artist {
+            font-size: 0.75rem;
+            color: var(--muted-foreground);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .history-time {
+            font-size: 0.75rem;
+            color: var(--muted-foreground);
+            white-space: nowrap;
+        }
+
+        .error-message {
+            background: hsl(0, 70%, 40%);
+            color: white;
+            padding: 1rem;
+            border-radius: calc(var(--radius) - 4px);
+            margin-bottom: 1rem;
+            display: none;
+            font-size: 0.875rem;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 1.5rem;
+            font-size: 0.875rem;
+            color: var(--muted-foreground);
+            border-top: 1px solid var(--border);
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer a:hover {
+            color: var(--primary-glow);
+        }
+
+        @media (max-width: 968px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .visualization-wrapper {
+                max-width: 500px;
+                margin: 0 auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="https://ko-fi.com/driftjohnson" target="_blank" class="donate-button" aria-label="Donate"></a>
+    
+    <div class="container">
+        <div class="player-card">
+            <div class="header">
+                <h1 class="station-name">SCUFFED EPOCH RADIO</h1>
+                <div class="status" id="status">🎵 Loading...</div>
+            </div>
+
+            <div class="main-content">
+                <!-- Left Column: 3D Visualization -->
+                <div class="visualization-wrapper">
+                    <div class="visualization-container">
+                        <canvas id="visualizer"></canvas>
+                    </div>
+                    
+                    <div class="caffeination-control">
+                        <div class="caffeination-icon" title="Caffeination">☕</div>
+                        <input 
+                            type="range" 
+                            min="0" 
+                            max="1" 
+                            step="0.01" 
+                            value="0" 
+                            class="caffeination-slider" 
+                            id="caffeinationSlider"
+                            aria-label="Caffeination"
+                        >
+                        <div class="caffeination-value" id="caffeinationValue">0</div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Controls & Info -->
+                <div class="controls-container">
+                    <div class="error-message" id="errorMessage"></div>
+
+                    <div class="now-playing">
+                        <div class="song-title" id="songTitle">Connecting...</div>
+                        <div class="song-artist" id="songArtist">JXHNSXNT</div>
+                    </div>
+
+                    <div class="controls">
+                        <button 
+                            class="control-button" 
+                            id="playButton" 
+                            aria-label="Play"
+                        >▶</button>
+                    </div>
+
+                    <div class="volume-control">
+                        <div class="volume-icon" id="volumeIcon">🔊</div>
+                        <input 
+                            type="range" 
+                            min="0" 
+                            max="1" 
+                            step="0.01" 
+                            value="0.7" 
+                            class="volume-slider" 
+                            id="volumeSlider"
+                            aria-label="Volume"
+                        >
+                        <div class="volume-value" id="volumeValue">70</div>
+                    </div>
+
+                    <div class="song-history" id="songHistory" style="display: none;">
+                        <h2 class="history-title">Recently Played</h2>
+                        <div class="history-list" id="historyList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                © 2025, <a href="https://www.scuffedepoch.com" target="_blank">SCUFFED EPOCH</a> ™
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_URL = 'https://radio.scuffedepoch.com/api/nowplaying/scuffed_epoch_radio';
+        const STREAM_URL = 'https://radio.scuffedepoch.com/listen/scuffed_epoch_radio/radio.mp3';
+
+        // State
+        let isPlaying = false;
+        let audio = null;
+        let audioContext = null;
+        let analyser = null;
+        let dataArray = null;
+        let source = null;
+        let caffeination = 0; // Caffeination level (0 to 1)
+
+        // Three.js variables
+        let scene, camera, renderer;
+        let ribbonLow, ribbonMid, ribbonHigh;
+        let time = 0;
+
+        // DOM Elements
+        const playButton = document.getElementById('playButton');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeIcon = document.getElementById('volumeIcon');
+        const volumeValue = document.getElementById('volumeValue');
+        const caffeinationSlider = document.getElementById('caffeinationSlider');
+        const caffeinationValue = document.getElementById('caffeinationValue');
+        const songTitle = document.getElementById('songTitle');
+        const songArtist = document.getElementById('songArtist');
+        const status = document.getElementById('status');
+        const errorMessage = document.getElementById('errorMessage');
+        const songHistory = document.getElementById('songHistory');
+        const historyList = document.getElementById('historyList');
+
+        // Initialize Three.js scene
+        function initThreeJS() {
+            const canvas = document.getElementById('visualizer');
+            const container = canvas.parentElement;
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(
+                60,
+                container.clientWidth / container.clientHeight,
+                0.1,
+                1000
+            );
+            camera.position.z = 3;
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Create ribbon geometries
+            ribbonLow = createRibbon(0xff0080, 0);    // Purple-ish
+            ribbonMid = createRibbon(0x00ff80, 120);  // Green-ish
+            ribbonHigh = createRibbon(0xffa500, 240); // Orange
+
+            scene.add(ribbonLow);
+            scene.add(ribbonMid);
+            scene.add(ribbonHigh);
+
+            // Handle resize
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // Create a ribbon (sine wave wrapped around sphere)
+        function createRibbon(color, offset) {
+            const segments = 200;
+            const radius = 1;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(segments * 3);
+            
+            for (let i = 0; i < segments; i++) {
+                const angle = (i / segments) * Math.PI * 4 + (offset * Math.PI / 180);
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                const z = Math.sin(i / segments * Math.PI * 8) * 0.2;
+                
+                positions[i * 3] = x;
+                positions[i * 3 + 1] = y;
+                positions[i * 3 + 2] = z;
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const material = new THREE.LineBasicMaterial({
+                color: color,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            return new THREE.Line(geometry, material);
+        }
+
+        // Update ribbon based on audio data
+        function updateRibbon(ribbon, frequencyData, frequencyStart, frequencyEnd, offset) {
+            const positions = ribbon.geometry.attributes.position.array;
+            const segments = positions.length / 3;
+            const radius = 1;
+
+            // Calculate average frequency for this band
+            let sum = 0;
+            for (let i = frequencyStart; i < frequencyEnd; i++) {
+                sum += frequencyData[i];
+            }
+            const avgFreq = sum / (frequencyEnd - frequencyStart);
+            const baseAmplitude = avgFreq / 255 * 0.5; // Scale amplitude
+            
+            // Apply caffeination multiplier (0 = calm, 1 = intense)
+            const caffeinationMultiplier = 1 + (caffeination * 4); // Range: 1x to 5x
+            const amplitude = baseAmplitude * caffeinationMultiplier;
+            
+            // Increase sine wave frequency/intensity with caffeination
+            const waveFrequency = 8 + (caffeination * 16); // Range: 8 to 24 waves
+            const timeMultiplier = 1 + (caffeination * 3); // Speed up animation
+
+            for (let i = 0; i < segments; i++) {
+                const angle = (i / segments) * Math.PI * 4 + (offset * Math.PI / 180) + time * 0.5 * timeMultiplier;
+                const waveOffset = Math.sin(i / segments * Math.PI * waveFrequency + time * 2 * timeMultiplier) * amplitude;
+                const expandedRadius = radius + waveOffset;
+                
+                positions[i * 3] = Math.cos(angle) * expandedRadius;
+                positions[i * 3 + 1] = Math.sin(angle) * expandedRadius;
+                positions[i * 3 + 2] = Math.sin(i / segments * Math.PI * waveFrequency + time * timeMultiplier) * (0.2 + amplitude);
+            }
+            
+            ribbon.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            // Get frequency data
+            if (analyser && dataArray) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                const bufferLength = analyser.frequencyBinCount;
+                const lowEnd = Math.floor(bufferLength * 0.15);
+                const midEnd = Math.floor(bufferLength * 0.5);
+                
+                updateRibbon(ribbonLow, dataArray, 0, lowEnd, 0);
+                updateRibbon(ribbonMid, dataArray, lowEnd, midEnd, 120);
+                updateRibbon(ribbonHigh, dataArray, midEnd, bufferLength, 240);
+            } else {
+                // Default animation when no audio
+                const defaultData = new Uint8Array(128).fill(30);
+                updateRibbon(ribbonLow, defaultData, 0, 42, 0);
+                updateRibbon(ribbonMid, defaultData, 42, 64, 120);
+                updateRibbon(ribbonHigh, defaultData, 64, 128, 240);
+            }
+
+            // Rotate scene slightly
+            scene.rotation.y = time * 0.1;
+            scene.rotation.x = Math.sin(time * 0.2) * 0.1;
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        function onWindowResize() {
+            const container = document.getElementById('visualizer').parentElement;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // Initialize audio and analyser
+        function initAudio() {
+            if (!audio) {
+                audio = new Audio(STREAM_URL);
+                audio.volume = parseFloat(volumeSlider.value);
+                audio.preload = 'none';
+                audio.crossOrigin = 'anonymous';
+                
+                // Add event listeners
+                audio.addEventListener('playing', () => {
+                    console.log('Audio: Playing');
+                    hideError();
+                });
+                
+                audio.addEventListener('error', (e) => {
+                    console.error('Audio error:', audio.error);
+                    showError('Unable to connect to stream. Please check your connection.');
+                    playButton.textContent = '▶';
+                    playButton.setAttribute('aria-label', 'Play');
+                    isPlaying = false;
+                });
+                
+                audio.addEventListener('pause', () => {
+                    if (isPlaying) {
+                        status.textContent = '⏸ Paused';
+                        status.classList.remove('live');
+                    }
+                });
+                
+                console.log('Audio initialized');
+            }
+
+            // Initialize Web Audio API for visualization
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+
+                if (!source) {
+                    source = audioContext.createMediaElementSource(audio);
+                    source.connect(analyser);
+                    analyser.connect(audioContext.destination);
+                }
+            }
+
+            return true;
+        }
+
+        // Toggle play/pause
+        function togglePlay() {
+            if (!audio) {
+                initAudio();
+            }
+
+            if (isPlaying) {
+                audio.pause();
+                playButton.textContent = '▶';
+                playButton.setAttribute('aria-label', 'Play');
+                isPlaying = false;
+            } else {
+                // Resume audio context if suspended
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+
+                const playPromise = audio.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        playButton.textContent = '⏸';
+                        playButton.setAttribute('aria-label', 'Pause');
+                        isPlaying = true;
+                        if (status.textContent === '🎵 Loading...') {
+                            status.textContent = '🔴 LIVE - Streaming';
+                            status.classList.add('live');
+                        }
+                    }).catch(err => {
+                        console.error('Playback failed:', err);
+                        showError('Playback failed: ' + err.name);
+                        playButton.textContent = '▶';
+                        isPlaying = false;
+                    });
+                }
+            }
+        }
+
+        // Handle volume change
+        function handleVolumeChange(e) {
+            const volume = parseFloat(e.target.value);
+            if (audio) {
+                audio.volume = volume;
+            }
+
+            const volumePercent = Math.round(volume * 100);
+            volumeValue.textContent = volumePercent;
+
+            if (volume === 0) {
+                volumeIcon.textContent = '🔇';
+            } else if (volume < 0.5) {
+                volumeIcon.textContent = '🔉';
+            } else {
+                volumeIcon.textContent = '🔊';
+            }
+        }
+
+        // Handle caffeination change
+        function handleCaffeinationChange(e) {
+            caffeination = parseFloat(e.target.value);
+            const caffeinationPercent = Math.round(caffeination * 100);
+            caffeinationValue.textContent = caffeinationPercent;
+        }
+
+        // Fetch now playing data
+        async function fetchNowPlaying() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                updateUI(data);
+                hideError();
+            } catch (err) {
+                console.error('API Error:', err);
+                console.warn('Metadata unavailable, but stream should still work');
+            }
+        }
+
+        // Update UI with now playing data
+        function updateUI(data) {
+            const nowPlaying = data.now_playing;
+            const currentSong = nowPlaying?.song;
+            const isLive = nowPlaying?.is_online;
+
+            // Update status
+            if (isPlaying || isLive) {
+                status.textContent = '🔴 LIVE';
+                status.classList.add('live');
+            } else {
+                status.textContent = isLive ? '🔴 LIVE' : '⚠️ OFFLINE';
+                if (isLive) status.classList.add('live');
+                else status.classList.remove('live');
+            }
+
+            // Update song info
+            if (currentSong) {
+                songTitle.textContent = currentSong.title || 'Unknown Title';
+                songArtist.textContent = currentSong.artist || 'JXHNSXNT';
+            }
+
+            // Update song history
+            if (data.song_history && data.song_history.length > 0) {
+                updateHistory(data.song_history.slice(0, 5));
+            }
+        }
+
+        // Update song history
+        function updateHistory(history) {
+            historyList.innerHTML = '';
+            
+            history.forEach(item => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+
+                const artElement = item.song.art 
+                    ? `<img src="${item.song.art}" alt="" class="history-album-art">`
+                    : `<div class="history-album-art">🎵</div>`;
+
+                historyItem.innerHTML = `
+                    ${artElement}
+                    <div class="history-info">
+                        <div class="history-song">${escapeHtml(item.song.title || 'Unknown')}</div>
+                        <div class="history-artist">${escapeHtml(item.song.artist || 'JXHNSXNT')}</div>
+                    </div>
+                    <div class="history-time">${formatTime(item.played_at)}</div>
+                `;
+
+                historyList.appendChild(historyItem);
+            });
+
+            songHistory.style.display = 'block';
+        }
+
+        // Format timestamp
+        function formatTime(timestamp) {
+            const date = new Date(timestamp * 1000);
+            const now = new Date();
+            const diff = Math.floor((now - date) / 1000 / 60);
+            
+            if (diff < 1) return 'Just now';
+            if (diff < 60) return `${diff}m ago`;
+            return `${Math.floor(diff / 60)}h ago`;
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Show error message
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        // Hide error message
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        // Event listeners
+        playButton.addEventListener('click', togglePlay);
+        volumeSlider.addEventListener('input', handleVolumeChange);
+        caffeinationSlider.addEventListener('input', handleCaffeinationChange);
+
+        // Initialize
+        console.log('Scuffed Epoch Radio Player - NSL Edition (3D Visualization)');
+        console.log('Stream URL:', STREAM_URL);
+        console.log('API URL:', API_URL);
+        
+        initThreeJS();
+        animate();
+        fetchNowPlaying();
+        setInterval(fetchNowPlaying, 15000);
+
+        // Set initial volume and caffeination display
+        volumeValue.textContent = Math.round(parseFloat(volumeSlider.value) * 100);
+        caffeinationValue.textContent = Math.round(parseFloat(caffeinationSlider.value) * 100);
+    </script>
+</body>
+</html>
